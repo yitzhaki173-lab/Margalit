@@ -289,10 +289,10 @@ function seriesSvg(seq, arcs, blanks, filled) {
     if (txt === '?') {
       s += `<text class="snum q" x="${cx(i)}" y="${top + 29}" text-anchor="middle">?</text>`;
     } else if (typeof txt === 'object') {
-      s += `<text class="snum ${got ? 'got' : ''}" x="${cx(i)}" y="${top + 19}" text-anchor="middle" font-size="15">${txt.n}</text><line x1="${cx(i) - 14}" x2="${cx(i) + 14}" y1="${top + 23}" y2="${top + 23}" stroke="currentColor"/><text class="snum ${got ? 'got' : ''}" x="${cx(i)}" y="${top + 39}" text-anchor="middle" font-size="15">${txt.d}</text>`;
+      s += `<text class="snum ${got ? 'got' : ''}" x="${cx(i)}" y="${top + 19}" text-anchor="middle" style="font-size:15px">${txt.n}</text><line x1="${cx(i) - 14}" x2="${cx(i) + 14}" y1="${top + 23}" y2="${top + 23}" stroke="currentColor"/><text class="snum ${got ? 'got' : ''}" x="${cx(i)}" y="${top + 39}" text-anchor="middle" style="font-size:15px">${txt.d}</text>`;
     } else {
       const str = fmtItem(txt);
-      s += `<text class="snum ${isB && !got ? 'q' : got ? 'got' : ''}" x="${cx(i)}" y="${top + 29}" text-anchor="middle" ${str.length > 4 ? 'font-size="15"' : ''}>${str}</text>`;
+      s += `<text class="snum ${isB && !got ? 'q' : got ? 'got' : ''}" x="${cx(i)}" y="${top + 29}" text-anchor="middle" ${str.length > 4 ? 'style="font-size:15px"' : ''}>${str}</text>`;
     }
   });
   const wpx = 16 + n * W;
@@ -439,6 +439,7 @@ function viewHome() {
     </div>
     ${last ? `<div class="row" style="border-top:1px solid var(--line);padding-top:12px"><span class="grow muted">באמצע: <b style="color:var(--ink)">${lastTitle}</b> (${pct(setProgress(last.id), 1)}%)</span><button class="btn small" data-go="set:${last.id}">המשך מקבץ</button></div>` : ''}
   </section>
+  ${installTip()}
   <section class="tiles" aria-label="קיצורים">
     <button class="tile" data-go="practice">${IC.practice}<b>תרגול חופשי</b><span>בחר נושא, קושי ומספר שאלות</span></button>
     <button class="tile" data-go="practice:sim">${IC.sim}<b>סימולציית מבחן</b><span>ממוחשב אדפטיבי או מבחן כיתה</span></button>
@@ -452,6 +453,13 @@ function viewHome() {
   </section>`;
 }
 
+function installTip() {
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let standalone = false;
+  try { standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches; } catch (e) { /* ignore */ }
+  if (!ios || standalone || DB.tipClosed) return '';
+  return `<section class="install-tip" aria-label="טיפ לאייפון"><span style="font-size:1.4rem">📲</span><div class="grow"><b>טיפ לאייפון:</b> כדי שההתקדמות תישמר לאורך זמן, הוסף את האפליקציה למסך הבית: כפתור השיתוף ⬆️ ← "הוסף למסך הבית", ומשם תמיד לפתוח אותה. (ספארי עלול למחוק נתונים של אתר שלא נפתח 7 ימים.)</div><button class="iconbtn" data-act="closetip" aria-label="סגור">✕</button></section>`;
+}
 function viewPlan() {
   return `<h1>תוכנית 14 הימים</h1><p class="muted">כל יום: שיעור טכניקות קצר ו-3-5 מקבצי תרגול (~45-60 שאלות). מומלץ ללכת לפי הסדר, אבל כל הימים פתוחים.</p>
   <div class="list">${PLAN.map((d) => { const p = dayProgress(d.day); return `<button class="item" data-go="day:${d.day}"><span class="daynum" style="font-size:1.6rem">${d.day}</span><span class="body"><span class="title">${d.title}</span><span class="sub">${d.goal}</span><span class="pbar ${p >= 0.999 ? 'ok' : ''}"><i style="width:${p * 100}%"></i></span></span><span class="end">${p >= 0.999 ? '<span class="chip ok">הושלם</span>' : p > 0 ? `<span class="chip">${pct(p, 1)}%</span>` : ''}<span class="muted" style="font-size:.78rem">${sum(d.sets.map((s) => s.n))} שאלות</span></span></button>`; }).join('')}</div>`;
@@ -568,7 +576,8 @@ function viewQuestion(id, iStr) {
   VIEW.id = id; VIEW.i = i; VIEW.lastId = id; VIEW.lastI = i; VIEW.route = ROUTE;
   if (fresh || !VIEW.qStart) VIEW.qStart = Date.now();
   const timed = def.timer && !done;
-  if (timed && (fresh || !VIEW.deadline)) VIEW.deadline = Date.now() + def.timer * 1000;
+  if (timed && !st.dl) { st.dl = Date.now() + def.timer * 1000; saveDB(); }
+  if (timed) VIEW.deadline = st.dl;
   const isLast = i === def.n - 1;
   const stats = entryStats(e);
   const head = `<div class="qhead">
@@ -774,7 +783,7 @@ function viewSettings() {
 }
 
 /* ---------- render & routing ---------- */
-function go(r) { if (r !== ROUTE) VIEW.pickMode = undefined; ROUTE = r; DB.lastRoute = r; saveDB(); render(); window.scrollTo(0, 0); }
+function go(r) { if (r !== ROUTE) { VIEW.pickMode = undefined; try { history.pushState(null, '', '#' + encodeURIComponent(r)); } catch (e) { /* sandboxed */ } } ROUTE = r; DB.lastRoute = r; saveDB(); render(); window.scrollTo(0, 0); }
 function render() {
   clearInterval(TICK); TICK = null;
   const [name, a, b] = ROUTE.split(':');
@@ -911,8 +920,8 @@ function onClick(ev) {
     case 'export': {
       const ta = document.getElementById('backup');
       ta.value = JSON.stringify(DB);
-      ta.select();
-      try { navigator.clipboard.writeText(ta.value).then(() => toast('קוד הגיבוי הועתק'), () => toast('סמן את הקוד והעתק אותו ידנית')); } catch (e) { toast('סמן את הקוד והעתק אותו ידנית'); }
+      const manual = () => { ta.focus(); ta.setSelectionRange(0, ta.value.length); toast('הקוד מסומן — העתק אותו ידנית'); };
+      try { navigator.clipboard.writeText(ta.value).then(() => toast('קוד הגיבוי הועתק'), manual); } catch (e) { manual(); }
       break;
     }
     case 'import': {
@@ -923,6 +932,7 @@ function onClick(ev) {
       } catch (e) { toast('הקוד לא תקין — ודא שהעתקת את כולו'); }
       break;
     }
+    case 'closetip': DB.tipClosed = true; saveDB(); render(); break;
     case 'reset': confirmBox('<b>למחוק את כל ההתקדמות?</b> פעולה זו לא ניתנת לביטול.', 'מחק הכול', () => { DB = freshDB(); saveDB(); applyTheme(); go('home'); }, true); break;
   }
 }
@@ -954,6 +964,9 @@ function boot() {
   try { render(); } catch (e) { console.error(e); ROUTE = 'home'; render(); }
   document.addEventListener('click', onClick);
   document.addEventListener('keydown', onKey);
+  document.addEventListener('touchstart', () => {}, { passive: true });
+  window.addEventListener('popstate', () => { ROUTE = decodeURIComponent(location.hash.slice(1)) || 'home'; DB.lastRoute = ROUTE; saveDB(); render(); });
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* ignore */ }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && ROUTE.startsWith('set:')) { const e = DB.sets[ROUTE.split(':')[1]]; if (e && e.def.sim && simCheckTime(e)) render(); }
   });

@@ -82,7 +82,8 @@ async function run(viewport, tag, full) {
         const ok = await page.evaluate(() => {
           const e = DB.sets[VIEW.id]; const it = e.qs[VIEW.i]; if (it.st.ok !== null) return 'done';
           const q = Q(it.spec);
-          const k = Math.random() < 0.75 ? q.answer : (q.answer + 1) % q.options.length;
+          const wrongs = q.options.map((_, j) => j).filter((j) => j !== q.answer && !it.st.elim.includes(j));
+          const k = Math.random() < 0.75 || !wrongs.length ? q.answer : wrongs[0];
           const b = document.querySelector(`.opt[data-k="${k}"]`); if (!b) return 'nobutton';
           b.click(); return document.querySelector('.feedback') ? 'ok' : 'nofeedback';
         });
